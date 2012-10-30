@@ -30,6 +30,9 @@ class CI_Mutex_semaphore extends CI_Mutex_driver
 		{
 			$this->$key = $this->CI->config->item($key);
 		}
+		
+		// Register our shutdown function so locks get closed properly
+		register_shutdown_function(array($this, '__destruct'));
 	}
 	
 	function __destruct()
@@ -74,8 +77,7 @@ class CI_Mutex_semaphore extends CI_Mutex_driver
 				$block = $this->mutex_max_lock;
 			}
 
-			//while (TRUE)
-			for($i = 0; $i < 5; $i++)
+			while (TRUE)
 			{
 				// Attempt to open the file
 				$mutex = $this->_connect($name);
@@ -83,15 +85,12 @@ class CI_Mutex_semaphore extends CI_Mutex_driver
 				if ($mutex !== FALSE)
 				{
 					$res = @sem_acquire($mutex);
-					$res = TRUE;
-					echo "lock ".$name."\n";
 				}
 				else
 				{
 					$res = FALSE;
 				}
 				
-				echo "|".$i."|";
 				if ($res !== FALSE)
 				{
 					$data["locked"] = TRUE;
@@ -134,7 +133,6 @@ class CI_Mutex_semaphore extends CI_Mutex_driver
 		{
 			if ($this->mutexes[$name]["locked"] === TRUE)
 			{
-				echo "unlock ".$name."\n";					
 				@sem_release($this->mutexes[$name]["mutex"]);
 				
 				$this->mutexes[$name]["locked"] = FALSE;
@@ -162,7 +160,6 @@ class CI_Mutex_semaphore extends CI_Mutex_driver
 	protected function _connect($name)
 	{
 		$id = $this->_ftok($this->mutex_path.$name.".mutex", "m");
-		echo "*".$name."*".$id."*\n";
 
 		if ($id === -1)
 		{

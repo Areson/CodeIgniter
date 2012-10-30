@@ -23,6 +23,9 @@ class CI_Mutex_flock extends CI_Mutex_driver
 		{
 			$this->$key = $this->CI->config->item($key);
 		}
+		
+		// Register our shutdown function so locks get closed properly
+		register_shutdown_function(array($this, '__destruct'));
 	}
 	
 	function __destruct()

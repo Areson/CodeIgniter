@@ -78,12 +78,12 @@ class CI_Session_concurrent extends CI_Session_driver {
 	public $sess_expiration			= 7200;
 	
 	/**
-	 * Length of time (in seconds) for multisessions to expire
+	 * Length of time (in seconds) for sessions to be forwarded
 	 * 
 	 * @var int
 	 */
-	public $sess_multi_expiration	= 15;
-
+	public $sess_forward_window		= 15;
+	
 	/**
 	 * Whether to kill session on close of browser window
 	 *
@@ -232,7 +232,7 @@ class CI_Session_concurrent extends CI_Session_driver {
 			'sess_static_table_name',
 			'sess_userdata_table_name',
 			'sess_expiration',
-			'sess_multi_expiration',
+			'sess_forward_window',
 			'sess_expire_on_close',
 			'sess_match_ip',
 			'sess_match_useragent',
@@ -262,9 +262,6 @@ class CI_Session_concurrent extends CI_Session_driver {
 		// Load the string helper so we can use the strip_slashes() function
 		$this->CI->load->helper('string');
 
-		// Load the mutex class so we can aquire locks
-		$this->CI->load->library("Mutex");
-
 		// Do we need encryption? If so, load the encryption class
 		if ($this->sess_encrypt_cookie === TRUE)
 		{
@@ -292,6 +289,10 @@ class CI_Session_concurrent extends CI_Session_driver {
 
 		// Register shutdown function
 		register_shutdown_function(array($this, '_update_db'));
+
+		// Load the mutex class so we can aquire locks. It gets loaded
+		// after our shutdown function so cleanup happens in the correct order.
+		$this->CI->load->library("Mutex");
 
 		// Set the "now" time. Can either be GMT or server time, based on the config prefs.
 		// We use this to set the "last activity" time
@@ -347,7 +348,7 @@ class CI_Session_concurrent extends CI_Session_driver {
 	public function sess_destroy()
 	{		
 		// Kill the session DB row
-		$this->_multisess_destroy();
+		$this->_db_session_destroy();
 
 		// Kill the cookie
 		$this->_setcookie($this->sess_cookie_name, addslashes(serialize(array())), ($this->now - 31500000),
@@ -688,9 +689,10 @@ class CI_Session_concurrent extends CI_Session_driver {
 		if ($row->session_old === 1)
 		{
 			// Has the window for the old session id expired?
-			if (($session['last_activity'] + $this->sess_multi_expiration) < $this->now)
+			if (($session['last_activity'] + $this->sess_forward_window) < $this->now)
 			{
-				$this->_multisess_destroy($row->old_session_id);
+				// Remove the data for the old session
+				$this->_db_session_destroy();
 			
 				// Release the lock on the old session id
 				$this->unlock_application_mutex($session['session_id']);
@@ -1082,11 +1084,11 @@ class CI_Session_concurrent extends CI_Session_driver {
 	 // ------------------------------------------------------------------------
 
 	/**
-	 * Destroy the entry in the database for the multisession
+	 * Destroy the entry in the database for the session
 	 * 
 	 * @return void
 	 */
-	protected function _multisess_destroy()
+	protected function _db_session_destroy()
 	{
 		$session_id = isset($this->userdata['session_id'])?$this->userdata['session_id']:NULL;
 		
