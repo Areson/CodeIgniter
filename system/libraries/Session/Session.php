@@ -87,7 +87,8 @@ class CI_Session extends CI_Driver_Library {
 		$this->valid_drivers = array(
 			'Session_native',
 		   	'Session_cookie',
-		   	'Session_ajax'
+		   	'Session_ajax',
+		   	'Session_concurrent'
 		);
 		$key = 'sess_valid_drivers';
 		$drivers = isset($params[$key]) ? $params[$key] : $CI->config->item($key);
